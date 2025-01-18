@@ -1,49 +1,66 @@
-#forest model
 import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score, classification_report, accuracy_score
 from sklearn.linear_model import LinearRegression
-'''
-reviews_df = pd.read_csv('./datasets/rotten_tomatoes_movie_reviews.csv')
-movies_df = pd.read_csv('./datasets/rotten_tomatoes_movies.csv')
-imdb_df = pd.read_csv('./datasets/imdb-movies-dataset.csv')
+from sklearn.linear_model import LogisticRegression
+from sklearn.utils import resample
+import scipy.sparse as sp
+import matplotlib.pyplot as plt
 
-
-reviews_df = reviews_df.drop_duplicates(subset=['id', 'reviewText'])
-movies_df = movies_df.drop_duplicates(subset=['id', 'title'])
-imdb_df = imdb_df.drop_duplicates(subset=['Title'])
-
-
-combined_df = pd.merge(reviews_df, movies_df, on='id', how='inner')
-final_df = pd.merge(combined_df, imdb_df, left_on='title', right_on='Title',how='inner')
-
-final_df = final_df[['title', 'id', 'reviewText', 'scoreSentiment', 'Rating']]
-final_df = final_df.drop_duplicates()
-final_df = final_df.dropna(subset=['id', 'title', 'reviewText','scoreSentiment', 'Rating'])
-
-final_df.to_csv('combined.csv')
-print("Combined CSV file has been created successfully.")'''
 final_df = pd.read_csv('combined.csv')
 # Jako ominaisuuksiin ja kohteeseen
 final_df['Sentiment_Label'] = final_df['scoreSentiment'].apply(lambda x: 1 if x=="POSITIVE" else 0)
 
 # Features and target selection for sentiment classification
-from sklearn.utils import resample
+
 
 # Example of upsampling the minority class
+final_df['Sentiment_Label'] = final_df['scoreSentiment'].apply(lambda x: 1 if x == "POSITIVE" else 0)
+
+# Upsample the minority class for sentiment
 majority_class = final_df[final_df['Sentiment_Label'] == 1]
 minority_class = final_df[final_df['Sentiment_Label'] == 0]
-
-minority_upsampled = resample(minority_class,
-                              replace=True,     # sample with replacement
-                              n_samples=len(majority_class),  # match majority class
-                              random_state=42)  # reproducible results
-
-# Combine majority and upsampled minority
+minority_upsampled = resample(minority_class, replace=True, n_samples=len(majority_class), random_state=42)
 upsampled = pd.concat([majority_class, minority_upsampled])
+
+
+# Define rating categories
+def categorize_rating(rating):
+    if rating <= 4:
+        return 'very_low'
+    elif rating <= 6:
+        return 'low'
+    elif rating <= 8:
+        return 'medium'
+    else:
+        return 'high'
+
+
+upsampled['Rating_Category'] = upsampled['Rating'].apply(categorize_rating)
+
+# Get the count of the most common category
+max_category_count = upsampled['Rating_Category'].value_counts().max()
+
+# Upsample each category to match the most common category
+upsampled_categories = []
+for category in ['very_low', 'low', 'medium', 'high']:
+    category_data = upsampled[upsampled['Rating_Category'] == category]
+    upsampled_category = resample(category_data,
+                                  replace=True,
+                                  n_samples=max_category_count,
+                                  random_state=42)
+    upsampled_categories.append(upsampled_category)
+
+# Combine all upsampled categories
+upsampled = pd.concat(upsampled_categories)
+
+print(f"Total samples after upsampling: {len(upsampled)}")
+print(f"Positive sentiment samples: {len(upsampled[upsampled['Sentiment_Label'] == 1])}")
+print(f"Negative sentiment samples: {len(upsampled[upsampled['Sentiment_Label'] == 0])}")
+print(upsampled['Rating_Category'].value_counts())
+
 
 # Prepare your features and labels from upsampled data
 X_sentiment = upsampled['reviewText']
@@ -62,10 +79,13 @@ X_train_sentiment, X_test_sentiment, y_train_sentiment, y_test_sentiment = train
     X_tfidf_sentiment, y_sentiment, test_size=0.2, random_state=42)
 
 # Train a Random Forest Classifier for sentiment prediction
-sentiment_model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42, n_jobs=18)
+# Create Logistic Regression model
+sentiment_model = LogisticRegression(random_state=42)
+
+# Train the model
 sentiment_model.fit(X_train_sentiment, y_train_sentiment)
 
-# Predict sentiment labels on the test set
+# Predict on the test set
 y_pred_sentiment = sentiment_model.predict(X_test_sentiment)
 
 # Evaluate sentiment classifier
@@ -88,7 +108,6 @@ X_tfidf_rating = tfidf_transformer_sentiment.transform(X_counts_rating)
 
 # Step 3: Combine TF-IDF features with predicted sentiment labels as an additional feature
 # Convert to DataFrame for easier manipulation
-import scipy.sparse as sp
 predicted_sentiment_features = sp.csr_matrix(upsampled['Predicted_Sentiment'].values).T  # Convert to sparse matrix
 X_combined = sp.hstack([X_tfidf_rating, predicted_sentiment_features])  # Combine TF-IDF and sentiment features
 
@@ -102,12 +121,15 @@ model.fit(X_train_rating, y_train_rating)
 
 # Ennustetaan testidatalla
 y_pred_rating = model.predict(X_test_rating)
-
+# Ennustetaan trainingdatalla
+y_pred_train = model.predict(X_train_rating)
 
 # Calculate and display metrics for IMDB rating prediction
 mse = mean_squared_error(y_test_rating, y_pred_rating)
+mse2 = mean_squared_error(y_train_rating, y_pred_train)
 r2 = r2_score(y_test_rating, y_pred_rating)
 print(f"Mean Squared Error (IMDB Rating Prediction): {mse:.2f}")
+print(f"Mean Squared Error (IMDB Rating train): {mse2:.2f}")
 print(f"R-squared (IMDB Rating Prediction): {r2:.2f}")
 
 # Save both models and transformers to files using pickle
@@ -124,6 +146,29 @@ with open('tfidf_transformer.pkl', 'wb') as tfidf_transformer_file:
     pickle.dump(tfidf_transformer_sentiment, tfidf_transformer_file)
 
 print("Models and transformers have been pickled and saved to files.")
+
+plt.figure(figsize=(10, 6))
+plt.scatter(y_test_rating, y_pred_rating, color='blue', alpha=0.6, label='Actual vs Predicted')
+plt.plot([min(y_test_rating), max(y_test_rating)], [min(y_test_rating), max(y_test_rating)], color='red', linewidth=2, label='Ideal Fit Line')
+
+plt.title('Neural Network: Actual vs Predicted IMDB Ratings')
+plt.xlabel('Actual IMDB Rating')
+plt.ylabel('Predicted IMDB Rating')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Scatter plot for trend line visualization
+plt.figure(figsize=(10, 6))
+plt.scatter(y_test_rating, y_pred_rating, color='blue', alpha=0.6, label='Actual Data')
+plt.plot(sorted(y_test_rating), sorted(y_pred_rating), color='orange', linewidth=2, label='Trend Line')
+
+plt.title('Predicted IMDB Rating Trend Line')
+plt.xlabel('Actual IMDB Rating')
+plt.ylabel('Predicted IMDB Rating')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 def test_review(review_text):
     # Transform the review text using the loaded count vectorizer and TF-IDF transformer

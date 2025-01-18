@@ -54,7 +54,11 @@ sample_reviews = [
     "A mediocre film, neither good nor bad.",
     "shit ass poop disgusting nauseating bad terrible",
     "amazing outstanding best good cool nice brilliant",
-    """When you watch a movie that you don't understand the meaning of, a movie that after watching it you basically think is useless. This is the sequel to Joker. I honestly expected something much better, I'm disappointed, I can't understand the reason for the movie, there's almost nothing that surprised me. Maybe the only feeling I really felt during the movie was boredom. I wonder if there was really a need for a Joker sequel, in my opinion no, in fact this disappointing sequel confirms my opinion. Sometimes it's better to stick with one film rather than have disappointing sequels like this film."""
+    """When you watch a movie that you don't understand the meaning of, a movie that after watching it you basically think is useless. This is the sequel to Joker. I honestly expected something much better, I'm disappointed, I can't understand the reason for the movie, there's almost nothing that surprised me. Maybe the only feeling I really felt during the movie was boredom. I wonder if there was really a need for a Joker sequel, in my opinion no, in fact this disappointing sequel confirms my opinion. Sometimes it's better to stick with one film rather than have disappointing sequels like this film.""",
+    "It is just what you want for the best movie. Great story great acting, thrilling twist. Just watched Joker in 2019, I just has to come back and give dark knight a 10. And thanks to Heath Ledger for the exceptional performs.",
+    "Best movie ever. Heath ledger's work is phenomenal no words.....",
+    "Shawshank redemption",
+    ""
 ]
 
 # Testing each review
